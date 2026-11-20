@@ -6989,5 +6989,45 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 </script>
 
 <!-- V90 legacy camera bridge disabled: replaced by orderCameraSupportFixedV91. -->
+    <!-- ================= Firebase Cloud Sync ================= -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
+    authDomain: "xpower3-1f5fd.firebaseapp.com",
+    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
+    projectId: "xpower3-1f5fd",
+    storageBucket: "xpower3-1f5fd.firebasestorage.app",
+    messagingSenderId: "915610586058",
+    appId: "1:915610586058:web:907839b2fcad344b0d9d33",
+    measurementId: "G-Y0LX01KYT8"
+  };
+  if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+  var database = firebase.database();
+  
+  var originalSetItem = localStorage.setItem;
+  var originalGetItem = localStorage.getItem;
+
+  localStorage.setItem = function(key, value) {
+      originalSetItem.call(localStorage, key, value);
+      database.ref(key).set(value);
+  };
+
+  localStorage.getItem = function(key) {
+      var localData = originalGetItem.call(localStorage, key);
+      database.ref(key).on('value', function(snapshot) {
+          var cloudData = snapshot.val();
+          if (cloudData !== null && cloudData !== localData) {
+              originalSetItem.call(localStorage, key, cloudData);
+              if (typeof window.loadAppData === 'function') { window.loadAppData(); } 
+              else if (typeof window.renderApp === 'function') { window.renderApp(); } 
+              else { location.reload(); }
+          }
+      });
+      return localData;
+  };
+</script>
+<!-- ====================================================== -->
 </body>
 </html>
