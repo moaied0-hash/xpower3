@@ -6988,7 +6988,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 })();
 </script>
 
-<!-- V90 legacy camera bridge disabled: replaced by orderCameraSupportFixedV91. -->
 <!-- ================= Firebase Cloud Sync Final V3 ================= -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -7057,8 +7056,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
               else if (typeof window.loadOrders === 'function') { window.loadOrders(); }
               else if (typeof window.updateUI === 'function') { window.updateUI(); }
               else { 
-                  // في حال لم توجد دوال تحديث، نكتفي بتحديث الصفحة بهدوء
-                  var currentScroll = window.scrollY;
                   window.location.reload(); 
               }
               
@@ -7075,5 +7072,5 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
 </script>
 <!-- ====================================================== -->
-    </body>
+</body>
 </html>
