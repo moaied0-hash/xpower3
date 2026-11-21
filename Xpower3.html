@@ -7058,11 +7058,23 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           isSyncing = true;
           originalSetItem.call(localStorage, key, cloudData);
           
-          if (typeof window.loadAppData === 'function') { window.loadAppData(); } 
-          else if (typeof window.renderApp === 'function') { window.renderApp(); }
-          else if (typeof window.loadOrders === 'function') { window.loadOrders(); }
-          else if (typeof window.updateUI === 'function') { window.updateUI(); }
-          
+                 // تحديث كل أجزاء الشاشة فوراً عند وصول بيانات جديدة
+       if (typeof window.renderOrders === 'function') window.renderOrders();
+       if (typeof window.renderTasks === 'function') window.renderTasks();
+       if (typeof window.renderEmployees === 'function') window.renderEmployees();
+       if (typeof window.renderReception === 'function') window.renderReception();
+       if (typeof window.loadAppData === 'function') window.loadAppData();
+       if (typeof window.renderApp === 'function') window.renderApp();
+       if (typeof window.loadOrders === 'function') window.loadOrders();
+       if (typeof window.updateUI === 'function') window.updateUI();
+       
+       // كحل أخير: تحديث الصفحة بدون "فلاش" (بدون ما تشعر أن الصفحة أعدت التحميل)
+       setTimeout(function() {
+           if (typeof window.location.reload === 'function' && isSyncing) {
+               // إذا كانت الصفحة لا تملك دوال تحديث، نعيد تحميلها بصمت
+               // window.location.reload(); 
+           }
+       }, 1000);          
           setTimeout(function() { isSyncing = false; }, 1000);
         }
       }, function(error) {
