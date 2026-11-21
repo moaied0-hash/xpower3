@@ -6989,102 +6989,91 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 </script>
 
 <!-- V90 legacy camera bridge disabled: replaced by orderCameraSupportFixedV91. -->
-    <!-- ================= Firebase Cloud Sync Final V3 ================= -->
+<!-- ================= Firebase Cloud Sync Final V3 ================= -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
-  // 1. إعدادات Firebase
-  var firebaseConfig = {
-    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
-    authDomain: "xpower3-1f5fd.firebaseapp.com",
-    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
-    projectId: "xpower3-1f5fd",
-    storageBucket: "xpower3-1f5fd.firebasestorage.app",
-    messagingSenderId: "915610586058",
-    appId: "1:915610586058:web:907839b2fcad344b0d9d33",
-    measurementId: "G-Y0LX01KYT8"
-  };
-  
-  // 2. تشغيل Firebase
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-  var database = firebase.database();
-  
-  // 3. إضافة مؤشر الاتصال (أسفل يسار الشاشة)
-  var statusDiv = document.createElement('div');
-  statusDiv.id = 'firebase-status-indicator';
-  statusDiv.style.cssText = 'position:fixed; bottom:15px; left:15px; padding:8px 14px; background:#64748b; color:white; border-radius:20px; font-size:12px; font-weight:bold; z-index:999999; display:flex; align-items:center; gap:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); font-family:sans-serif;';
-  statusDiv.innerHTML = '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fbbf24;"></span> جاري الاتصال...';
-  
-  // نضيف المؤشر للصفحة بعد ما تحمل
-  window.addEventListener('DOMContentLoaded', function() {
-    document.body.appendChild(statusDiv);
-  });
-
-  // 4. مراقبة حالة الاتصال
-  database.ref('.info/connected').on('value', function(snap) {
-    if (snap.val() === true) {
-      statusDiv.style.background = '#16a34a'; 
-      statusDiv.innerHTML = '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fff;"></span> متصل بالسحابة';
-    } else {
-      statusDiv.style.background = '#ef4444'; 
-      statusDiv.innerHTML = '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fff;"></span> غير متصل';
-    }
-  });
-
-  // 5. اعتراض أوامر الحفظ (LocalStorage)
-  var originalSetItem = localStorage.setItem;
-  var originalGetItem = localStorage.getItem;
-  var isSyncing = false;
-
-  localStorage.setItem = function(key, value) {
-    originalSetItem.call(localStorage, key, value);
-    if (!isSyncing) {
-      database.ref(key).set(value).catch(function(error) {
-        console.warn("Firebase Save Error: ", error);
+  try {
+      var firebaseConfig = {
+        apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
+        authDomain: "xpower3-1f5fd.firebaseapp.com",
+        databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
+        projectId: "xpower3-1f5fd",
+        storageBucket: "xpower3-1f5fd.firebasestorage.app",
+        messagingSenderId: "915610586058",
+        appId: "1:915610586058:web:907839b2fcad344b0d9d33",
+        measurementId: "G-Y0LX01KYT8"
+      };
+      
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      var database = firebase.database();
+      
+      var statusDiv = document.createElement('div');
+      statusDiv.id = 'firebase-status-indicator';
+      statusDiv.style.cssText = 'position:fixed; bottom:15px; left:15px; padding:8px 14px; background:#64748b; color:white; border-radius:20px; font-size:12px; font-weight:bold; z-index:999999; display:flex; align-items:center; gap:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); font-family:sans-serif;';
+      statusDiv.innerHTML = '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fbbf24;"></span> جاري الاتصال...';
+      
+      window.addEventListener('DOMContentLoaded', function() {
+        document.body.appendChild(statusDiv);
       });
-    }
-  };
 
-  // 6. اعتراض أوامر القراءة (LocalStorage)
-  localStorage.getItem = function(key) {
-    var localData = originalGetItem.call(localStorage, key);
-    
-    if (!isSyncing) {
-      database.ref(key).on('value', function(snapshot) {
-        var cloudData = snapshot.val();
-        if (cloudData !== null && cloudData !== localData) {
-          isSyncing = true;
-          originalSetItem.call(localStorage, key, cloudData);
-          
-                 // تحديث كل أجزاء الشاشة فوراً عند وصول بيانات جديدة
-       if (typeof window.renderOrders === 'function') window.renderOrders();
-       if (typeof window.renderTasks === 'function') window.renderTasks();
-       if (typeof window.renderEmployees === 'function') window.renderEmployees();
-       if (typeof window.renderReception === 'function') window.renderReception();
-       if (typeof window.loadAppData === 'function') window.loadAppData();
-       if (typeof window.renderApp === 'function') window.renderApp();
-       if (typeof window.loadOrders === 'function') window.loadOrders();
-       if (typeof window.updateUI === 'function') window.updateUI();
-       
-       // كحل أخير: تحديث الصفحة بدون "فلاش" (بدون ما تشعر أن الصفحة أعدت التحميل)
-       setTimeout(function() {
-           if (typeof window.location.reload === 'function' && isSyncing) {
-               // إذا كانت الصفحة لا تملك دوال تحديث، نعيد تحميلها بصمت
-               // window.location.reload(); 
-           }
-       }, 1000);          
-          setTimeout(function() { isSyncing = false; }, 1000);
+      database.ref('.info/connected').on('value', function(snap) {
+        if (snap.val() === true) {
+          statusDiv.style.background = '#16a34a'; 
+          statusDiv.innerHTML = '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fff;"></span> متصل بالسحابة';
+        } else {
+          statusDiv.style.background = '#ef4444'; 
+          statusDiv.innerHTML = '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fff;"></span> غير متصل';
         }
-      }, function(error) {
-        console.warn("Firebase Read Error: ", error);
       });
-    }
-    return localData;
-  };
+
+      var originalSetItem = localStorage.setItem;
+      var originalGetItem = localStorage.getItem;
+      var isSyncing = false;
+
+      localStorage.setItem = function(key, value) {
+        originalSetItem.call(localStorage, key, value);
+        if (!isSyncing) {
+          database.ref(key).set(value).catch(function(error) {
+            console.warn("Firebase Save Error: ", error);
+          });
+        }
+      };
+
+      localStorage.getItem = function(key) {
+        var localData = originalGetItem.call(localStorage, key);
+        
+        if (!isSyncing) {
+          database.ref(key).on('value', function(snapshot) {
+            var cloudData = snapshot.val();
+            if (cloudData !== null && cloudData !== localData) {
+              isSyncing = true;
+              originalSetItem.call(localStorage, key, cloudData);
+              
+              if (typeof window.loadAppData === 'function') { window.loadAppData(); } 
+              else if (typeof window.renderApp === 'function') { window.renderApp(); }
+              else if (typeof window.loadOrders === 'function') { window.loadOrders(); }
+              else if (typeof window.updateUI === 'function') { window.updateUI(); }
+              else { 
+                  // في حال لم توجد دوال تحديث، نكتفي بتحديث الصفحة بهدوء
+                  var currentScroll = window.scrollY;
+                  window.location.reload(); 
+              }
+              
+              setTimeout(function() { isSyncing = false; }, 1000);
+            }
+          }, function(error) {
+            console.warn("Firebase Read Error: ", error);
+          });
+        }
+        return localData;
+      };
+  } catch (error) {
+      console.error("Firebase Initialization Error: ", error);
+  }
 </script>
 <!-- ====================================================== -->
-
     </body>
 </html>
