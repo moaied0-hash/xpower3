@@ -7080,221 +7080,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 })();
 </script>
 
-<script id="taskCardDisplayPatchV69">
-(function(){
-  function cleanTaskCards(){
-    const roots = document.querySelectorAll(
-      '[data-task-id], .task-card, .employee-task-card, .order-card'
-    );
-    roots.forEach(function(card){
-      if(card.dataset.v69Done==="1") return;
-      const text = card.textContent || "";
-      // Do not rewrite data; only mark common invoice/customer nodes when present.
-      const candidates = card.querySelectorAll("div,span,p,strong,b");
-      candidates.forEach(function(el){
-        const t=(el.textContent||"").trim();
-        if(!t) return;
-        if(/^(الفاتورة|رقم الفاتورة)[:：]/.test(t)){
-          el.classList.add("task-card-v69-invoice");
-          el.classList.add("task-card-v69-primary");
-        }
-        if(/^(العميل|اسم العميل)[:：]/.test(t)){
-          el.classList.add("task-card-v69-customer");
-        }
-      });
-      card.dataset.v69Done="1";
-    });
-  }
-  document.addEventListener("DOMContentLoaded", cleanTaskCards);
-  if(window.MutationObserver){
-    new MutationObserver(cleanTaskCards).observe(document.body,{childList:true,subtree:true});
-  }
-})();
-</script>
-
-<!-- V90 legacy camera bridge disabled: replaced by orderCameraSupportFixedV91. -->
-
-<style>
-/* Required-field marker: small red star */
-.required-field-star{color:#dc2626!important;font-weight:800;margin-inline-start:3px;font-size:12px;vertical-align:super;}
-</style>
-<script>
-(function(){
-  function markRequiredFields(){
-    document.querySelectorAll('input[required],select[required],textarea[required]').forEach(function(field){
-      if(field.dataset.requiredStarDone==='1') return;
-      var parent=field.parentElement;
-      var label=parent ? parent.querySelector('label') : null;
-      if(label){
-        var star=document.createElement('span');
-        star.className='required-field-star';
-        star.setAttribute('aria-hidden','true');
-        star.textContent='*';
-        label.appendChild(star);
-      } else if(field.id==='deptNameInput'){
-        var caption=document.createElement('span');
-        caption.className='text-xs font-semibold text-slate-600';
-        caption.style.cssText='display:block;margin-bottom:4px;';
-        caption.innerHTML='اسم القسم الجديد <span class="required-field-star" aria-hidden="true">*</span>';
-        field.parentElement.insertBefore(caption,field);
-      }
-      field.dataset.requiredStarDone='1';
-    });
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',markRequiredFields);
-  else markRequiredFields();
-})();
-</script>
-    <!-- ==================================================== -->
-<!-- كود المزامنة مع Firebase - جاهز للنسخ -->
 <!-- ==================================================== -->
-<script type="module">
-  // 1. استيراد مكتبات Firebase من CDN
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  // 2. إعدادات مشروعك
-  const firebaseConfig = {
-    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
-    authDomain: "xpower3-1f5fd.firebaseapp.com",
-    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
-    projectId: "xpower3-1f5fd",
-    storageBucket: "xpower3-1f5fd.firebasestorage.app",
-    messagingSenderId: "915610586058",
-    appId: "1:915610586058:web:907839b2fcad344b0d9d33"
-  };
-
-  // 3. تهيئة Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // 4. دالة المزامنة (تقرأ كل شيء من localStorage وترفعه)
-  window.syncAllDataToCloud = async function() {
-    try {
-      let localData = {};
-      // نقرأ كل المفاتيح الموجودة في localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        try {
-          localData[key] = JSON.parse(localStorage.getItem(key));
-        } catch (e) {
-          localData[key] = localStorage.getItem(key);
-        }
-      }
-
-      if (Object.keys(localData).length === 0) {
-        showToast("⚠️ لا توجد بيانات محلية للمزامنة", "#f59e0b");
-        return;
-      }
-
-      // نرفع البيانات لمجموعة appData ومستند backup
-      const docRef = doc(db, "appData", "backup");
-      await setDoc(docRef, { data: localData, lastSync: new Date().toISOString() }, { merge: true });
-      
-      console.log("✅ تمت المزامنة بنجاح!", localData);
-      showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
-    } catch (e) {
-      console.error("❌ فشلت المزامنة:", e);
-      showToast("❌ فشلت المزامنة: " + e.message, "#dc2626");
-    }
-  };
-
-  // دالة الإشعارات
-  function showToast(msg, color) {
-    const toast = document.createElement('div');
-    toast.textContent = msg;
-    toast.style.cssText = `position:fixed; bottom:80px; right:20px; background:${color}; color:white; padding:10px 18px; border-radius:8px; z-index:99999; font-weight:bold; font-family:system-ui; box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-  }
-
-  // زر المزامنة العائم
-  const syncBtn = document.createElement('button');
-  syncBtn.innerHTML = "☁️ مزامنة";
-  syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
-  syncBtn.onclick = window.syncAllDataToCloud;
-  document.body.appendChild(syncBtn);
-
-  console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
-</script>
-    <!-- ==================================================== -->
-<!-- كود المزامنة مع Firebase Realtime Database -->
+<!-- كود المزامنة مع Firebase (بعد تصحيح الأخطاء) -->
 <!-- ==================================================== -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
-    authDomain: "xpower3-1f5fd.firebaseapp.com",
-    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
-    projectId: "xpower3-1f5fd",
-    storageBucket: "xpower3-1f5fd.firebasestorage.app",
-    messagingSenderId: "915610586058",
-    appId: "1:915610586058:web:907839b2fcad344b0d9d33"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  window.syncAllDataToCloud = async function() {
-    try {
-      let localData = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        try {
-          localData[key] = JSON.parse(localStorage.getItem(key));
-        } catch (e) {
-          localData[key] = localStorage.getItem(key);
-        }
-      }
-
-      if (Object.keys(localData).length === 0) {
-        showToast("⚠️ لا توجد بيانات محلية للمزامنة", "#f59e0b");
-        return;
-      }
-
-      // هنا يتم الرفع إلى Realtime Database تحت مسار اسمه 'backup'
-      const dbRef = ref(db, 'backup'); 
-      await set(dbRef, {
-        data: localData,
-        lastSync: new Date().toISOString()
-      });
-      
-      console.log("✅ تمت المزامنة بنجاح!", localData);
-      showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
-    } catch (e) {
-      console.error("❌ فشلت المزامنة:", e);
-      showToast("❌ فشلت المزامنة: " + e.message, "#dc2626");
-    }
-  };
-
-  function showToast(msg, color) {
-    const toast = document.createElement('div');
-    toast.textContent = msg;
-    toast.style.cssText = `position:fixed; bottom:80px; right:20px; background:${color}; color:white; padding:10px 18px; border-radius:8px; z-index:99999; font-weight:bold; font-family:system-ui; box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-  }
-
-  const syncBtn = document.createElement('button');
-  syncBtn.innerHTML = "☁️ مزامنة";
-  syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
-  syncBtn.onclick = window.syncAllDataToCloud;
-  document.body.appendChild(syncBtn);
-
-  console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
-</script>
-    <!-- ==================================================== -->
-<!-- كود المزامنة مع Firebase (الطريقة التقليدية - مضمونة 100%) -->
-<!-- ==================================================== -->
-
-<!-- 1. تحميل مكتبات Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-  // 2. إعدادات مشروعك
   var firebaseConfig = {
     apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
     authDomain: "xpower3-1f5fd.firebaseapp.com",
@@ -7305,18 +7097,23 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     appId: "1:915610586058:web:907839b2fcad344b0d9d33"
   };
 
-  // 3. تهيئة Firebase
   if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
   var database = firebase.database();
 
-  // 4. دالة المزامنة
   window.syncAllDataToCloud = function() {
     try {
       var localData = {};
+      // نقرأ البيانات ونتجاهل أي مفتاح يحتوي على رموز ممنوعة
       for (var i = 0; i < localStorage.length; i++) {
         var key = localStorage.key(i);
+        
+        // تجاهل مفاتيح Firebase الداخلية أو أي مفاتيح تحتوي على رموز ممنوعة
+        if (key.includes('firebase') || key.includes('.') || key.includes('/') || key.includes('#') || key.includes('$') || key.includes('[') || key.includes(']')) {
+          continue; // نتخطى هذا المفتاح
+        }
+
         try {
           localData[key] = JSON.parse(localStorage.getItem(key));
         } catch (e) {
@@ -7325,16 +7122,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       }
 
       if (Object.keys(localData).length === 0) {
-        showToast("⚠️ لا توجد بيانات محلية للمزامنة", "#f59e0b");
+        showToast("⚠️ لا توجد بيانات محلية صالحة للمزامنة", "#f59e0b");
         return;
       }
 
-      // نرفع البيانات إلى Realtime Database تحت مسار 'backup'
+      // رفع البيانات
       database.ref('backup').set({
         data: localData,
         lastSync: new Date().toISOString()
       }).then(function() {
-        console.log("✅ تمت المزامنة بنجاح!");
+        console.log("✅ تمت المزامنة بنجاح!", localData);
         showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
       }).catch(function(error) {
         console.error("❌ فشلت المزامنة:", error);
@@ -7347,7 +7144,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }
   };
 
-  // 5. دالة الإشعارات
   function showToast(msg, color) {
     var toast = document.createElement('div');
     toast.textContent = msg;
@@ -7356,7 +7152,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     setTimeout(function() { toast.remove(); }, 4000);
   }
 
-  // 6. إنشاء زر المزامنة
   var syncBtn = document.createElement('button');
   syncBtn.innerHTML = "☁️ مزامنة";
   syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
@@ -7364,6 +7159,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   document.body.appendChild(syncBtn);
 
   console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
-</script>
+</script></script>
 </body>
 </html>
