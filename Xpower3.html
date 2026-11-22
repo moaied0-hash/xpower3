@@ -7145,5 +7145,96 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   else markRequiredFields();
 })();
 </script>
+    <!-- ==================================================== -->
+<!-- كود المزامنة مع Firebase Firestore - جاهز للاستخدام -->
+<!-- ==================================================== -->
+<script type="module">
+  // 1. استيراد مكتبات Firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // 2. إعدادات مشروعك (من Firebase Console)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
+    authDomain: "xpower3-1f5fd.firebaseapp.com",
+    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
+    projectId: "xpower3-1f5fd",
+    storageBucket: "xpower3-1f5fd.firebasestorage.app",
+    messagingSenderId: "915610586058",
+    appId: "1:915610586058:web:907839b2fcad344b0d9d33"
+  };
+
+  // 3. تهيئة Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const ordersCollection = collection(db, "orders"); // اسم المجموعة (Collection) في Firestore
+
+  // ====================================================
+  // 4. دالة حفظ طلب جديد في السحابة (مزامنة)
+  // ====================================================
+  window.syncOrderToCloud = async function(orderData) {
+    try {
+      // orderData هو كائن يحتوي على بيانات الطلب
+      const docRef = await addDoc(ordersCollection, {
+        ...orderData,
+        createdAt: new Date().toISOString() // إضافة وقت الإنشاء
+      });
+      console.log("✅ تمت المزامنة بنجاح. ID:", docRef.id);
+      return true;
+    } catch (e) {
+      console.error("❌ فشلت المزامنة:", e);
+      alert("حدث خطأ أثناء المزامنة مع السحابة: " + e.message);
+      return false;
+    }
+  };
+
+  // ====================================================
+  // 5. دالة جلب جميع الطلبات من السحابة
+  // ====================================================
+  window.fetchOrdersFromCloud = async function() {
+    try {
+      const querySnapshot = await getDocs(ordersCollection);
+      const orders = [];
+      querySnapshot.forEach((doc) => {
+        orders.push({ id: doc.id, ...doc.data() });
+      });
+      console.log("✅ تم جلب الطلبات:", orders.length);
+      return orders;
+    } catch (e) {
+      console.error("❌ فشل جلب الطلبات:", e);
+      return [];
+    }
+  };
+
+  // ====================================================
+  // 6. دالة حذف طلب من السحابة
+  // ====================================================
+  window.deleteOrderFromCloud = async function(docId) {
+    try {
+      await deleteDoc(doc(db, "orders", docId));
+      console.log("✅ تم الحذف من السحابة");
+      return true;
+    } catch (e) {
+      console.error("❌ فشل الحذف:", e);
+      return false;
+    }
+  };
+
+  // ====================================================
+  // 7. دالة تحديث بيانات طلب موجود
+  // ====================================================
+  window.updateOrderInCloud = async function(docId, updatedData) {
+    try {
+      await updateDoc(doc(db, "orders", docId), updatedData);
+      console.log("✅ تم التحديث في السحابة");
+      return true;
+    } catch (e) {
+      console.error("❌ فشل التحديث:", e);
+      return false;
+    }
+  };
+
+  console.log("🔥 نظام المزامنة جاهز للعمل");
+</script>
 </body>
 </html>
