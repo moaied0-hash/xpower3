@@ -7213,5 +7213,187 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }, 30000);
 })();
 </script>
+    <!-- ================================================================
+     XPower Cloud Sync — Realtime Database
+     يرفع كل بيانات localStorage للسحابة ويستمع للتغييرات من الأجهزة الأخرى
+     ================================================================ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, get }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
+  authDomain: "xpower3-1f5fd.firebaseapp.com",
+  databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
+  projectId: "xpower3-1f5fd",
+  storageBucket: "xpower3-1f5fd.firebasestorage.app",
+  messagingSenderId: "915610586058",
+  appId: "1:915610586058:web:907839b2fcad344b0d9d33"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+/* ------- إعدادات ------- */
+const DEVICE_ID = localStorage.getItem("xp_device_id") || (() => {
+  const id = "dev_" + Math.random().toString(36).slice(2, 10);
+  localStorage.setItem("xp_device_id", id);
+  return id;
+})();
+
+// مفاتيح localStorage اللي نريد مزامنتها (عدّلها لو في مفاتيح ثانية)
+const KEYS_TO_SYNC = [
+  "orders",
+  "employees",
+  "accounts",
+  "customers",
+  "garment_measurement_forms_v26",
+  "xp_settings",
+  "xp_stages",
+  // ضع أسماء أي مفاتيح localStorage أخرى تستخدمها هنا
+];
+
+// اسم مساحة المشروع في قاعدة البيانات
+const ROOT = "xpower";
+
+/* ------- مراقبة التغييرات المحلية ورفعها للسحابة ------- */
+const originalSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  originalSetItem(key, value);
+  if (KEYS_TO_SYNC.includes(key)) {
+    pushToCloud(key, value);
+  }
+};
+
+function pushToCloud(key, value) {
+  const path = `${ROOT}/${key}`;
+  set(ref(db, path), {
+    value: value,
+    updatedAt: Date.now(),
+    updatedBy: DEVICE_ID
+  }).catch(err => console.error("[Sync] فشل الرفع:", key, err));
+}
+
+/* ------- سحب البيانات من السحابة والاستماع للتحديثات ------- */
+function listenKey(key) {
+  const cloudRef = ref(db, `${ROOT}/${key}`);
+  onValue(cloudRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data || typeof data.value !== "string") return;
+    // نتجاهل التحديثات اللي جاية من نفس الجهاز
+    if (data.updatedBy === DEVICE_ID) return;
+
+    const current = localStorage.getItem(key);
+    if (current === data.value) return;
+
+    // نكتب مباشرة بدون المرور على setItem المعدّل (تجنب حلقة لا نهائية)
+    originalSetItem(key, data.value);
+    console.log(`[Sync] تم تحديث ${key} من جهاز آخر`);
+
+    // إعادة تحميل الصفحة عشان تنعكس البيانات
+    // (لو عندك دالة render() تعيد الرسم بس، استبدل السطر التالي بها)
+    if (typeof window.render === "function") {
+      try { window.render(); } catch(e) {}
+    }
+    if (typeof window.saveOrders === "function") {
+      try { window.saveOrders(); } catch(e) {}
+    }
+    // إشعار بسيط للمستخدم
+    showSyncToast(`تمت مزامنة البيانات من جهاز آخر`);
+  });
+}
+
+/* ------- رفع البيانات المحلية الموجودة مسبقاً (أول مرة فقط) ------- */
+async function initialUpload() {
+  const flag = localStorage.getItem("xp_first_upload_done");
+  if (flag === "1") return;
+
+  console.log("[Sync] رفع أولي لكل البيانات المحلية...");
+  for (const key of KEYS_TO_SYNC) {
+    const local = localStorage.getItem(key);
+    if (local === null) continue;
+    try {
+      const snap = await get(ref(db, `${ROOT}/${key}`));
+      if (!snap.exists()) {
+        await set(ref(db, `${ROOT}/${key}`), {
+          value: local,
+          updatedAt: Date.now(),
+          updatedBy: DEVICE_ID
+        });
+      }
+    } catch(e) {
+      console.warn("[Sync] تخطي", key, e);
+    }
+  }
+  localStorage.setItem("xp_first_upload_done", "1");
+  showSyncToast("تم تجهيز المزامنة السحابية ✔");
+}
+
+/* ------- إشعار بسيط ------- */
+function showSyncToast(msg) {
+  let el = document.getElementById("xpSyncToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "xpSyncToast";
+    el.style.cssText = `
+      position:fixed;bottom:20px;left:20px;z-index:999999;
+      background:#1d2738;color:#fff;padding:10px 16px;border-radius:10px;
+      font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.3);
+      transition:opacity .3s;
+    `;
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = "1";
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = "0"; }, 3000);
+}
+
+/* ------- الحالة في الأعلى ------- */
+function showSyncStatus(state) {
+  let badge = document.getElementById("xpSyncBadge");
+  if (!badge) {
+    badge = document.createElement("div");
+    badge.id = "xpSyncBadge";
+    badge.style.cssText = `
+      position:fixed;top:8px;left:8px;z-index:999999;
+      padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;
+      color:#fff;
+    `;
+    document.body.appendChild(badge);
+  }
+  badge.style.background = state === "online" ? "#16a34a" : "#ef4444";
+  badge.textContent = state === "online" ? "☁ متصل" : "⚠ غير متصل";
+}
+
+/* ------- بدء المزامنة ------- */
+async function start() {
+  showSyncStatus("online");
+  await initialUpload();
+  KEYS_TO_SYNC.forEach(listenKey);
+  console.log("[Sync] المزامنة مفعّلة. الجهاز:", DEVICE_ID);
+}
+
+start().catch(err => {
+  console.error("[Sync] خطأ:", err);
+  showSyncStatus("offline");
+});
+
+// مراقبة حالة الاتصال بالإنترنت
+window.addEventListener("offline", () => showSyncStatus("offline"));
+window.addEventListener("online",  () => showSyncStatus("online"));
+
+// إتاحة الدوال يدوياً من الـ Console لو احتجت
+window.xpSync = {
+  upload: initialUpload,
+  force: () => {
+    KEYS_TO_SYNC.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v !== null) pushToCloud(k, v);
+    });
+  }
+};
+</script>
 </body>
 </html>
