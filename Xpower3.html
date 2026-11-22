@@ -7077,15 +7077,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       return false;
     }
   },true);
-})();
-</script>
-<!-- ==================================================== -->
-<!-- كود المزامنة النهائي (الذي يمسح المخلفات ويرفع البيانات) -->
+    <!-- ==================================================== -->
+<!-- كود المزامنة مع Firebase - النسخة النهائية (انسخ من هنا إلى النهاية) -->
 <!-- ==================================================== -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
+  // 1. إعدادات مشروعك
   var firebaseConfig = {
     apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
     authDomain: "xpower3-1f5fd.firebaseapp.com",
@@ -7096,23 +7095,25 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     appId: "1:915610586058:web:907839b2fcad344b0d9d33"
   };
 
+  // 2. تهيئة Firebase
   if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
   var database = firebase.database();
 
+  // 3. دالة المزامنة
   window.syncAllDataToCloud = function() {
     try {
       var localData = {};
-      var keysToRemove = []; // لنحفظ المفاتيح السيئة ونحذفها
+      var keysToRemove = [];
 
+      // نقرأ البيانات ونتجاهل أي مفتاح يحتوي على رموز ممنوعة
       for (var i = 0; i < localStorage.length; i++) {
         var key = localStorage.key(i);
         
-        // فحص قاسي جداً: أي مفتاح فيه نقطتين أو نقطة أو كلمة firebase يعتبر ملوثاً
         if (key.includes(':') || key.includes('.') || key.toLowerCase().includes('firebase')) {
-            keysToRemove.push(key); // نضيفه لقائمة الحذف
-            continue; // نتخطاه
+            keysToRemove.push(key);
+            continue;
         }
 
         var rawData = localStorage.getItem(key);
@@ -7123,7 +7124,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         }
       }
 
-      // هنا نقوم بتنظيف المتصفح من إعدادات Firebase القديمة التي تسبب الخطأ
+      // تنظيف المتصفح من الإعدادات القديمة
       for (var j = 0; j < keysToRemove.length; j++) {
           localStorage.removeItem(keysToRemove[j]);
       }
@@ -7133,7 +7134,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         return;
       }
 
-      // إرسال البيانات النظيفة
+      // رفع البيانات
       database.ref('backup').set({
         data: localData,
         lastSync: new Date().toISOString()
@@ -7150,6 +7151,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }
   };
 
+  // دالة الإشعارات
   function showToast(msg, color) {
     var toast = document.createElement('div');
     toast.textContent = msg;
@@ -7158,6 +7160,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     setTimeout(function() { toast.remove(); }, 4000);
   }
 
+  // إنشاء زر المزامنة
   var syncBtn = document.createElement('button');
   syncBtn.innerHTML = "☁️ مزامنة";
   syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
@@ -7166,5 +7169,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
 </script>
+<!-- ==================================================== -->
+<!-- نهاية كود المزامنة -->
+<!-- ==================================================== -->
 </body>
 </html>
