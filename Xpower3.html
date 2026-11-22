@@ -7078,9 +7078,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }
   },true);
 })();
-</script>
-<!-- ==================================================== -->
-<!-- كود المزامنة مع Firebase (النسخة النهائية والمضمونة) -->
+</script><!-- ==================================================== -->
+<!-- كود المزامنة النهائي (الذي يمسح المخلفات ويرفع البيانات) -->
 <!-- ==================================================== -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -7104,27 +7103,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   window.syncAllDataToCloud = function() {
     try {
       var localData = {};
-      
-      // نمر على جميع المفاتيح في localStorage
+      var keysToRemove = []; // لنحفظ المفاتيح السيئة ونحذفها
+
       for (var i = 0; i < localStorage.length; i++) {
         var key = localStorage.key(i);
         
-        // 1. تجاهل أي مفتاح يحتوي على كلمة "firebase" (وهذا هو سبب الخطأ)
-        if (key.toLowerCase().includes('firebase')) {
-            continue;
+        // فحص قاسي جداً: أي مفتاح فيه نقطتين أو نقطة أو كلمة firebase يعتبر ملوثاً
+        if (key.includes(':') || key.includes('.') || key.toLowerCase().includes('firebase')) {
+            keysToRemove.push(key); // نضيفه لقائمة الحذف
+            continue; // نتخطاه
         }
 
-        // 2. تجاهل أي مفتاح يحتوي على رموز ممنوعة (مثل . / # $ [ ])
-        if (/[\.\/\#\$\[\]]/.test(key)) {
-            continue;
-        }
-
-        // 3. تجاهل المفاتيح الطويلة جداً (التي غالباً ما تكون صور Base64)
-        if (key.length > 100) {
-            continue;
-        }
-
-        // إذا تجاوز المفتاح كل هذه الفحوصات، فهو آمن للرفع
         var rawData = localStorage.getItem(key);
         try {
           localData[key] = JSON.parse(rawData);
@@ -7133,15 +7122,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         }
       }
 
-      // فحص نهائي: إذا لم نجد أي بيانات صالحة
+      // هنا نقوم بتنظيف المتصفح من إعدادات Firebase القديمة التي تسبب الخطأ
+      for (var j = 0; j < keysToRemove.length; j++) {
+          localStorage.removeItem(keysToRemove[j]);
+      }
+
       if (Object.keys(localData).length === 0) {
-        showToast("⚠️ لم يتم العثور على بيانات صالحة للمزامنة (تأكد من إضافة طلب أولاً)", "#f59e0b");
+        showToast("⚠️ لا توجد بيانات صالحة للمزامنة", "#f59e0b");
         return;
       }
 
-      console.log("البيانات التي سيتم رفعها:", localData);
-
-      // نرفع البيانات
+      // إرسال البيانات النظيفة
       database.ref('backup').set({
         data: localData,
         lastSync: new Date().toISOString()
@@ -7155,7 +7146,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
     } catch (e) {
       console.error("❌ خطأ:", e);
-      showToast("❌ خطأ: " + e.message, "#dc2626");
     }
   };
 
