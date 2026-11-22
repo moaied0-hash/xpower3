@@ -7077,100 +7077,81 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       return false;
     }
   },true);
-    <!-- ==================================================== -->
-<!-- كود المزامنة مع Firebase - النسخة النهائية (انسخ من هنا إلى النهاية) -->
-<!-- ==================================================== -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-<script>
-  // 1. إعدادات مشروعك
-  var firebaseConfig = {
-    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
-    authDomain: "xpower3-1f5fd.firebaseapp.com",
-    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
-    projectId: "xpower3-1f5fd",
-    storageBucket: "xpower3-1f5fd.firebasestorage.app",
-    messagingSenderId: "915610586058",
-    appId: "1:915610586058:web:907839b2fcad344b0d9d33"
-  };
-
-  // 2. تهيئة Firebase
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-  var database = firebase.database();
-
-  // 3. دالة المزامنة
-  window.syncAllDataToCloud = function() {
-    try {
-      var localData = {};
-      var keysToRemove = [];
-
-      // نقرأ البيانات ونتجاهل أي مفتاح يحتوي على رموز ممنوعة
-      for (var i = 0; i < localStorage.length; i++) {
-        var key = localStorage.key(i);
-        
-        if (key.includes(':') || key.includes('.') || key.toLowerCase().includes('firebase')) {
-            keysToRemove.push(key);
-            continue;
-        }
-
-        var rawData = localStorage.getItem(key);
-        try {
-          localData[key] = JSON.parse(rawData);
-        } catch (e) {
-          localData[key] = rawData;
-        }
-      }
-
-      // تنظيف المتصفح من الإعدادات القديمة
-      for (var j = 0; j < keysToRemove.length; j++) {
-          localStorage.removeItem(keysToRemove[j]);
-      }
-
-      if (Object.keys(localData).length === 0) {
-        showToast("⚠️ لا توجد بيانات صالحة للمزامنة", "#f59e0b");
-        return;
-      }
-
-      // رفع البيانات
-      database.ref('backup').set({
-        data: localData,
-        lastSync: new Date().toISOString()
-      }).then(function() {
-        console.log("✅ تمت المزامنة بنجاح!");
-        showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
-      }).catch(function(error) {
-        console.error("❌ فشلت المزامنة:", error);
-        showToast("❌ فشلت المزامنة: " + error.message, "#dc2626");
-      });
-
-    } catch (e) {
-      console.error("❌ خطأ:", e);
-    }
-  };
-
-  // دالة الإشعارات
-  function showToast(msg, color) {
-    var toast = document.createElement('div');
-    toast.textContent = msg;
-    toast.style.cssText = "position:fixed; bottom:80px; right:20px; background:" + color + "; color:white; padding:10px 18px; border-radius:8px; z-index:99999; font-weight:bold; font-family:system-ui; box-shadow:0 4px 12px rgba(0,0,0,0.15);";
-    document.body.appendChild(toast);
-    setTimeout(function() { toast.remove(); }, 4000);
-  }
-
-  // إنشاء زر المزامنة
-  var syncBtn = document.createElement('button');
-  syncBtn.innerHTML = "☁️ مزامنة";
-  syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
-  syncBtn.onclick = window.syncAllDataToCloud;
-  document.body.appendChild(syncBtn);
-
-  console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
+})();
 </script>
-<!-- ==================================================== -->
-<!-- نهاية كود المزامنة -->
-<!-- ==================================================== -->
+
+<script id="taskCardDisplayPatchV69">
+(function(){
+  function cleanTaskCards(){
+    const roots = document.querySelectorAll(
+      '[data-task-id], .task-card, .employee-task-card, .order-card'
+    );
+    roots.forEach(function(card){
+      if(card.dataset.v69Done==="1") return;
+      const text = card.textContent || "";
+      // Do not rewrite data; only mark common invoice/customer nodes when present.
+      const candidates = card.querySelectorAll("div,span,p,strong,b");
+      candidates.forEach(function(el){
+        const t=(el.textContent||"").trim();
+        if(!t) return;
+        if(/^(الفاتورة|رقم الفاتورة)[:：]/.test(t)){
+          el.classList.add("task-card-v69-invoice");
+          el.classList.add("task-card-v69-primary");
+        }
+        if(/^(العميل|اسم العميل)[:：]/.test(t)){
+          el.classList.add("task-card-v69-customer");
+        }
+      });
+      card.dataset.v69Done="1";
+    });
+  }
+  document.addEventListener("DOMContentLoaded", cleanTaskCards);
+  if(window.MutationObserver){
+    new MutationObserver(cleanTaskCards).observe(document.body,{childList:true,subtree:true});
+  }
+})();
+</script>
+
+<!-- V90 legacy camera bridge disabled: replaced by orderCameraSupportFixedV91. -->
+
+<style>
+/* Required-field marker: small red star */
+.required-field-star{color:#dc2626!important;font-weight:800;margin-inline-start:3px;font-size:12px;vertical-align:super;}
+</style>
+<script>
+(function(){
+  function markRequiredFields(){
+    document.querySelectorAll('input[required],select[required],textarea[required]').forEach(function(field){
+      if(field.dataset.requiredStarDone==='1') return;
+      var parent=field.parentElement;
+      var label=parent ? parent.querySelector('label') : null;
+      if(label){
+        var star=document.createElement('span');
+        star.className='required-field-star';
+        star.setAttribute('aria-hidden','true');
+        star.textContent='*';
+        label.appendChild(star);
+      } else if(field.id==='deptNameInput'){
+        var caption=document.createElement('span');
+        caption.className='text-xs font-semibold text-slate-600';
+        caption.style.cssText='display:block;margin-bottom:4px;';
+        caption.innerHTML='اسم القسم الجديد <span class="required-field-star" aria-hidden="true">*</span>';
+        field.parentElement.insertBefore(caption,field);
+      }
+      field.dataset.requiredStarDone='1';
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',markRequiredFields);
+  else markRequiredFields();
+})();
+</script>
+  <!-- استدعاء مكتبات Firebase الأساسية -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  
+  <!-- استدعاء ملف المزامنة المنفصل -->
+  <script src="firebase-sync.js">
+</script>
+</body>
 </body>
 </html>
