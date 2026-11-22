@@ -1821,14 +1821,20 @@ function saveAll() {
     localStorage.setItem(STORAGE.employees, JSON.stringify(employees));
     localStorage.setItem(STORAGE.accounts, JSON.stringify(accounts));
     localStorage.setItem(STORAGE.orders, JSON.stringify(orders));
-}
 
-function pruneOptionalMannequinImagesForStorage() {
-    // صور المانيكان مطلوبة للعرض في مراحل الطلب؛ لا نحذفها تلقائياً.
-    // يتم تقليل حجم الصور الجديدة عند توليدها بدلاً من إتلاف الصور المحفوظة.
-    return 0;
+    // ====================================================
+    // إضافة المزامنة: نرسل الطلبات إلى Firebase
+    // ====================================================
+    if (window.syncAllDataToCloud) {
+        // نستدعي دالة المزامنة ونمرر لها البيانات
+        window.syncAllDataToCloud({
+            departments: departments,
+            employees: employees,
+            accounts: accounts,
+            orders: orders
+        });
+    }
 }
-
 function saveOrders() {
     const payload = JSON.stringify(orders);
     try {
@@ -7235,6 +7241,57 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   };
 
   console.log("🔥 نظام المزامنة جاهز للعمل");
+</script>
+    <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
+    authDomain: "xpower3-1f5fd.firebaseapp.com",
+    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
+    projectId: "xpower3-1f5fd",
+    storageBucket: "xpower3-1f5fd.firebasestorage.app",
+    messagingSenderId: "915610586058",
+    appId: "1:915610586058:web:907839b2fcad344b0d9d33"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // دالة المزامنة: تحفظ جميع البيانات في مستند واحد
+  window.syncAllDataToCloud = async function(allData) {
+    try {
+      // نستخدم اسم مستند ثابت 'backup' لحفظ كل البيانات معاً
+      const docRef = doc(db, "appData", "backup");
+      
+      // نرفع البيانات
+      await setDoc(docRef, {
+        ...allData,
+        lastSync: new Date().toISOString()
+      }, { merge: true }); // merge: true تحافظ على البيانات القديمة وتحدثها
+
+      console.log("✅ تمت المزامنة بنجاح!", new Date().toLocaleTimeString());
+      
+      // إظهار إشعار صغير (اختياري)
+      const toast = document.createElement('div');
+      toast.textContent = "☁️ تمت المزامنة";
+      toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#16a34a; color:white; padding:10px 18px; border-radius:8px; z-index:99999; font-weight:bold; font-family:system-ui;";
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+
+    } catch (e) {
+      console.error("❌ فشلت المزامنة:", e);
+      // إظهار تنبيه صغير
+      const toast = document.createElement('div');
+      toast.textContent = "❌ فشلت المزامنة";
+      toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#dc2626; color:white; padding:10px 18px; border-radius:8px; z-index:99999; font-weight:bold; font-family:system-ui;";
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+  };
+
+  console.log("🔥 نظام المزامنة جاهز");
 </script>
 </body>
 </html>
