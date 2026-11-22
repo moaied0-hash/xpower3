@@ -7170,35 +7170,46 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const text  = document.getElementById('onlineStatusText');
 
   function renderOnline() {
-    badge.style.background = '#dcfce7';
-    badge.style.color      = '#166534';
-    badge.style.borderColor= '#86efac';
-    dot.style.background   = '#22c55e';
-    dot.style.boxShadow    = '0 0 0 3px rgba(34,197,94,.22)';
-    text.textContent       = 'متصل';
+    badge.style.background  = '#dcfce7';
+    badge.style.color       = '#166534';
+    badge.style.borderColor = '#86efac';
+    dot.style.background    = '#22c55e';
+    dot.style.boxShadow     = '0 0 0 3px rgba(34,197,94,.22)';
+    text.textContent        = 'متصل';
   }
   function renderOffline() {
-    badge.style.background = '#fee2e2';
-    badge.style.color      = '#991b1b';
-    badge.style.borderColor= '#fca5a5';
-    dot.style.background   = '#ef4444';
-    dot.style.boxShadow    = '0 0 0 3px rgba(239,68,68,.22)';
-    text.textContent       = 'غير متصل';
+    badge.style.background  = '#fee2e2';
+    badge.style.color       = '#991b1b';
+    badge.style.borderColor = '#fca5a5';
+    dot.style.background    = '#ef4444';
+    dot.style.boxShadow     = '0 0 0 3px rgba(239,68,68,.22)';
+    text.textContent        = 'غير متصل';
   }
 
-  function update() { navigator.onLine ? renderOnline() : renderOffline(); }
-
+  // الحالة الأساسية من الجهاز
+  function update() {
+    navigator.onLine ? renderOnline() : renderOffline();
+  }
   window.addEventListener('online',  update);
   window.addEventListener('offline', update);
   update();
 
-  // فحص اختياري لاتصال حقيقي بالإنترنت (مو مجرد شبكة محلية)
-  // كل 30 ثانية يتحقق من ملف صغير على الإنترنت
+  // فحص اختياري — لا يغيّر الحالة إلا إذا الجهاز نفسه صار offline
+  // أو فشل الفحص عدة مرات متتالية
+  let failCount = 0;
   setInterval(() => {
     if (!navigator.onLine) { renderOffline(); return; }
-    fetch('https://www.gstatic.com/generate_204', { method: 'HEAD', cache: 'no-store' })
-      .then(() => renderOnline())
-      .catch(() => renderOffline());
+
+    fetch('https://www.gstatic.com/generate_204', {
+      method: 'HEAD',
+      cache:  'no-store',
+      mode:   'no-cors'
+    })
+    .then(() => { failCount = 0; renderOnline(); })
+    .catch(() => {
+      failCount++;
+      if (failCount >= 3) renderOffline(); // 3 محاولات فاشلة متتالية فقط
+    });
   }, 30000);
 })();
 </script>
