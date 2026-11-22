@@ -7079,9 +7079,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   },true);
 })();
 </script>
-
 <!-- ==================================================== -->
-<!-- كود المزامنة مع Firebase - النسخة النهائية (مضمونة) -->
+<!-- كود المزامنة مع Firebase (النسخة النهائية والمضمونة) -->
 <!-- ==================================================== -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -7104,34 +7103,50 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   window.syncAllDataToCloud = function() {
     try {
-      // هنا نحدد أسماء المفاتيح التي نريد مزامنتها فقط (تجنب إعدادات Firebase)
-      // استخدمنا الأسماء الشائعة، يمكنك تعديلها إذا كانت مختلفة
-      var keysToSync = ['xpower_orders', 'xpower_employees', 'xpower_accounts', 'xpower_departments', 'orders', 'employees', 'accounts', 'departments'];
       var localData = {};
+      
+      // نمر على جميع المفاتيح في localStorage
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        
+        // 1. تجاهل أي مفتاح يحتوي على كلمة "firebase" (وهذا هو سبب الخطأ)
+        if (key.toLowerCase().includes('firebase')) {
+            continue;
+        }
 
-      for (var i = 0; i < keysToSync.length; i++) {
-        var key = keysToSync[i];
+        // 2. تجاهل أي مفتاح يحتوي على رموز ممنوعة (مثل . / # $ [ ])
+        if (/[\.\/\#\$\[\]]/.test(key)) {
+            continue;
+        }
+
+        // 3. تجاهل المفاتيح الطويلة جداً (التي غالباً ما تكون صور Base64)
+        if (key.length > 100) {
+            continue;
+        }
+
+        // إذا تجاوز المفتاح كل هذه الفحوصات، فهو آمن للرفع
         var rawData = localStorage.getItem(key);
-        if (rawData) {
-          try {
-            localData[key] = JSON.parse(rawData);
-          } catch (e) {
-            localData[key] = rawData;
-          }
+        try {
+          localData[key] = JSON.parse(rawData);
+        } catch (e) {
+          localData[key] = rawData;
         }
       }
 
+      // فحص نهائي: إذا لم نجد أي بيانات صالحة
       if (Object.keys(localData).length === 0) {
-        showToast("⚠️ لم يتم العثور على بيانات في التخزين المحلي للمزامنة", "#f59e0b");
+        showToast("⚠️ لم يتم العثور على بيانات صالحة للمزامنة (تأكد من إضافة طلب أولاً)", "#f59e0b");
         return;
       }
 
-      // نرفع البيانات المفصلة فقط
+      console.log("البيانات التي سيتم رفعها:", localData);
+
+      // نرفع البيانات
       database.ref('backup').set({
         data: localData,
         lastSync: new Date().toISOString()
       }).then(function() {
-        console.log("✅ تمت المزامنة بنجاح!", localData);
+        console.log("✅ تمت المزامنة بنجاح!");
         showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
       }).catch(function(error) {
         console.error("❌ فشلت المزامنة:", error);
