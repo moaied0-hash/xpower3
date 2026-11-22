@@ -1822,19 +1822,43 @@ function saveAll() {
     localStorage.setItem(STORAGE.accounts, JSON.stringify(accounts));
     localStorage.setItem(STORAGE.orders, JSON.stringify(orders));
 
-    // ====================================================
-    // إضافة المزامنة: نرسل الطلبات إلى Firebase
-    // ====================================================
-    if (window.syncAllDataToCloud) {
-        // نستدعي دالة المزامنة ونمرر لها البيانات
-        window.syncAllDataToCloud({
-            departments: departments,
-            employees: employees,
-            accounts: accounts,
-            orders: orders
-        });
+   window.syncAllDataToCloud = async function() {
+    try {
+      // نقرأ البيانات مباشرة من localStorage (المكان الذي يعمل فيه التطبيق)
+      // تأكدنا من أسماء المفاتيح من دالة saveAll في تطبيقك
+      
+      // نستخدم try/catch لكل عنصر لتفادي الانهيار إذا كان المفتاح غير موجود
+      let localOrders = [];
+      let localEmployees = [];
+      let localAccounts = [];
+      let localDepts = [];
+
+      try { localOrders = JSON.parse(localStorage.getItem('xpower_orders')) || []; } catch(e) { console.warn('لا توجد طلبات'); }
+      try { localEmployees = JSON.parse(localStorage.getItem('xpower_employees')) || []; } catch(e) {}
+      try { localAccounts = JSON.parse(localStorage.getItem('xpower_accounts')) || []; } catch(e) {}
+      try { localDepts = JSON.parse(localStorage.getItem('xpower_departments')) || []; } catch(e) {}
+
+      // إذا كانت هناك أسماء أخرى، يمكنك إضافتها هنا
+      
+      const allData = {
+        orders: localOrders,
+        employees: localEmployees,
+        accounts: localAccounts,
+        departments: localDepts
+      };
+
+      console.log("جاري مزامنة البيانات:", allData);
+
+      const docRef = doc(db, "appData", "backup");
+      await setDoc(docRef, { ...allData, lastSync: new Date().toISOString() }, { merge: true });
+      
+      console.log("✅ تمت المزامنة بنجاح!");
+      showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
+    } catch (e) {
+      console.error("❌ فشلت المزامنة:", e);
+      showToast("❌ فشلت المزامنة: " + e.message, "#dc2626");
     }
-}
+};
 function saveOrders() {
     const payload = JSON.stringify(orders);
     try {
