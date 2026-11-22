@@ -7217,5 +7217,73 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
 </script>
+    <!-- ==================================================== -->
+<!-- كود المزامنة مع Firebase Realtime Database -->
+<!-- ==================================================== -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
+    authDomain: "xpower3-1f5fd.firebaseapp.com",
+    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
+    projectId: "xpower3-1f5fd",
+    storageBucket: "xpower3-1f5fd.firebasestorage.app",
+    messagingSenderId: "915610586058",
+    appId: "1:915610586058:web:907839b2fcad344b0d9d33"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  window.syncAllDataToCloud = async function() {
+    try {
+      let localData = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        try {
+          localData[key] = JSON.parse(localStorage.getItem(key));
+        } catch (e) {
+          localData[key] = localStorage.getItem(key);
+        }
+      }
+
+      if (Object.keys(localData).length === 0) {
+        showToast("⚠️ لا توجد بيانات محلية للمزامنة", "#f59e0b");
+        return;
+      }
+
+      // هنا يتم الرفع إلى Realtime Database تحت مسار اسمه 'backup'
+      const dbRef = ref(db, 'backup'); 
+      await set(dbRef, {
+        data: localData,
+        lastSync: new Date().toISOString()
+      });
+      
+      console.log("✅ تمت المزامنة بنجاح!", localData);
+      showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
+    } catch (e) {
+      console.error("❌ فشلت المزامنة:", e);
+      showToast("❌ فشلت المزامنة: " + e.message, "#dc2626");
+    }
+  };
+
+  function showToast(msg, color) {
+    const toast = document.createElement('div');
+    toast.textContent = msg;
+    toast.style.cssText = `position:fixed; bottom:80px; right:20px; background:${color}; color:white; padding:10px 18px; border-radius:8px; z-index:99999; font-weight:bold; font-family:system-ui; box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  const syncBtn = document.createElement('button');
+  syncBtn.innerHTML = "☁️ مزامنة";
+  syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
+  syncBtn.onclick = window.syncAllDataToCloud;
+  document.body.appendChild(syncBtn);
+
+  console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
+</script>
 </body>
 </html>
