@@ -5,127 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام تتبع الملابس والتفصيل</title>
-<script id="xpowerCloudSync">
-/* ===== مزامنة البيانات بين الأجهزة (Firebase Realtime Database) =====
-   ضع رابط قاعدة البيانات هنا، مثال: https://xpower3-default-rtdb.firebaseio.com */
-(function(){
-  var DB_URL = "https://xpower3-1f5fd-default-rtdb.firebaseio.com";
-  var ROOT   = "xpower3";
-  var POLL_MS = 8000;
-  if(!DB_URL || DB_URL.indexOf("PASTE")===0) return;
-  DB_URL = DB_URL.replace(/\/+$/,"");
-
-  var ls = window.localStorage;
-  var P = Storage.prototype;
-  var _get=P.getItem, _set=P.setItem, _rem=P.removeItem;
-  var META="__xp_sync_meta";
-  function isSynced(k){ return typeof k==="string" && /^garment_/.test(k) && k!=="garment_language" && k!=="garment_logged_in"; }
-  function url(path){ return DB_URL+"/"+ROOT+(path?"/"+path:"")+".json"; }
-  function getMeta(){ try{ return JSON.parse(_get.call(ls,META)||"{}"); }catch(e){ return {}; } }
-  function setMeta(m){ try{ _set.call(ls,META,JSON.stringify(m)); }catch(e){} }
-
-  var dirty={}, timers={}, stale={}, applying=false, online=true;
-
-  /* ---- 1) سحب البيانات قبل ما يشتغل النظام (طلب متزامن) ---- */
-  try{
-    var x=new XMLHttpRequest();
-    x.open("GET",url(""),false);
-    x.send(null);
-    if(x.status===200){
-      var cloud=JSON.parse(x.responseText)||{};
-      var cm=cloud.meta||{}, cd=cloud.data||{}, lm=getMeta();
-      applying=true;
-      Object.keys(cm).forEach(function(k){
-        if(!isSynced(k)) return;
-        if((lm[k]||0) < cm[k]){
-          var rec=cd[k];
-          if(rec && rec.v!=null) _set.call(ls,k,rec.v); else _rem.call(ls,k);
-          lm[k]=cm[k];
-        } else if((lm[k]||0) > cm[k]){ dirty[k]=true; }
-      });
-      applying=false;
-      for(var i=0;i<ls.length;i++){
-        var k2=ls.key(i);
-        if(isSynced(k2) && cm[k2]==null){ lm[k2]=lm[k2]||Date.now(); dirty[k2]=true; }
-      }
-      setMeta(lm);
-    } else { online=false; }
-  }catch(e){ applying=false; online=false; }
-
-  /* ---- 2) أي حفظ جديد يُرفع تلقائياً ---- */
-  P.setItem=function(k,v){ _set.apply(this,arguments); if(this===ls && !applying && isSynced(k)) touch(k); };
-  P.removeItem=function(k){ _rem.apply(this,arguments); if(this===ls && !applying && isSynced(k)) touch(k); };
-
-  function touch(k){
-    if(stale[k]) return;
-    var m=getMeta(); m[k]=Date.now(); setMeta(m);
-    dirty[k]=true;
-    clearTimeout(timers[k]);
-    timers[k]=setTimeout(function(){ push(k); },800);
-  }
-  function push(k){
-    var t=getMeta()[k]||Date.now();
-    var v=_get.call(ls,k);
-    return fetch(url("data/"+k),{method:"PUT",body:JSON.stringify({v:v,t:t})})
-      .then(function(r){ if(!r.ok) throw 0; return fetch(url("meta/"+k),{method:"PUT",body:JSON.stringify(t)}); })
-      .then(function(r){ if(!r.ok) throw 0; delete dirty[k]; setStatus(true); })
-      .catch(function(){ setStatus(false); });
-  }
-
-  /* ---- 3) فحص دوري لتحديثات الأجهزة الثانية ---- */
-  var lastActive=Date.now();
-  ["click","keydown","touchstart","mousemove"].forEach(function(ev){ document.addEventListener(ev,function(){ lastActive=Date.now(); },true); });
-
-  function check(){
-    Object.keys(dirty).forEach(function(k){ if(!stale[k]) push(k); });
-    return fetch(url("meta")).then(function(r){ return r.json(); }).then(function(rm){
-      setStatus(true);
-      rm=rm||{}; var lm=getMeta(), pulls=[];
-      Object.keys(rm).forEach(function(k){ if(isSynced(k) && (lm[k]||0)<rm[k] && !dirty[k]) pulls.push(k); });
-      if(!pulls.length) return;
-      return Promise.all(pulls.map(function(k){
-        return fetch(url("data/"+k)).then(function(r){ return r.json(); }).then(function(rec){ return {k:k,rec:rec}; });
-      })).then(function(list){
-        var m=getMeta(); applying=true;
-        list.forEach(function(o){
-          if(o.rec && o.rec.v!=null) _set.call(ls,o.k,o.rec.v); else _rem.call(ls,o.k);
-          m[o.k]=rm[o.k]; stale[o.k]=true;
-        });
-        applying=false; setMeta(m);
-        notifyUpdate();
-      });
-    }).catch(function(){ setStatus(false); });
-  }
-  setInterval(check,POLL_MS);
-  document.addEventListener("visibilitychange",function(){ if(!document.hidden) check(); });
-  window.addEventListener("online",check);
-
-  /* ---- 4) واجهة بسيطة: حالة الاتصال + إشعار التحديث ---- */
-  var badge, banner;
-  function ui(){
-    if(badge||!document.body) return;
-    badge=document.createElement("div");
-    badge.style.cssText="position:fixed;bottom:8px;left:8px;z-index:99998;font:12px sans-serif;background:#111827;color:#fff;padding:4px 10px;border-radius:999px;opacity:.75;pointer-events:none";
-    document.body.appendChild(badge); setStatus(online);
-  }
-  function setStatus(ok){ online=ok; if(!badge) return; badge.textContent=ok?"☁ متزامن":"⚠ غير متصل"; badge.style.background=ok?"#065f46":"#b91c1c"; }
-  function notifyUpdate(){
-    if(!banner && document.body){
-      banner=document.createElement("div");
-      banner.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99999;background:#2563eb;color:#fff;text-align:center;padding:10px;font:14px sans-serif;cursor:pointer";
-      banner.textContent="🔄 توجد تحديثات من جهاز آخر — اضغط هنا لتحديث الصفحة";
-      banner.onclick=function(){ location.reload(); };
-      document.body.appendChild(banner);
-    }
-    var iv=setInterval(function(){
-      var a=document.activeElement, typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
-      if(Date.now()-lastActive>15000 && !typing){ clearInterval(iv); location.reload(); }
-    },3000);
-  }
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",ui); else ui();
-  setTimeout(function(){ Object.keys(dirty).forEach(function(k){ push(k); }); },1500);
-})();
-</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 <style>
@@ -1139,6 +1018,55 @@ button[onclick="searchOrderFromDashboard()"] i {
 .stats-row-single > div > div:last-child { padding: 8px !important; flex-shrink: 0; }
 </style>
 
+
+<style id="xpower-modern-visual-refresh">
+/* Visual refresh only: preserve existing app logic and markup */
+:root{--xp-ink:#172554;--xp-blue:#2563eb;--xp-indigo:#4f46e5;--xp-surface:#ffffff;--xp-line:#e2e8f0;--xp-shadow:0 10px 28px rgba(15,23,42,.07)}
+body{background:linear-gradient(180deg,#f4f7ff 0,#f8fafc 240px,#f8fafc 100%)!important;color:#1e293b}
+body,button,input,select,textarea{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif}
+header.sticky{background:linear-gradient(120deg,#1d4ed8,#4338ca)!important;box-shadow:0 8px 26px rgba(37,99,235,.2)!important}
+header.sticky h1{letter-spacing:.1px}
+main{padding-bottom:38px!important}
+main .bg-white,main .rounded-lg,main .rounded-xl{transition:box-shadow .18s ease,border-color .18s ease}
+main .bg-white{border-color:#e7edf7!important}
+main .shadow,main .shadow-md,main .shadow-lg{box-shadow:var(--xp-shadow)!important}
+main .rounded-lg{border-radius:14px!important}
+main .rounded-xl{border-radius:18px!important}
+main input:not([type=checkbox]):not([type=radio]):not([type=file]),main select,main textarea{border:1px solid #dbe4f0!important;border-radius:11px!important;background:#fff!important;transition:border-color .15s,box-shadow .15s!important}
+main input:focus,main select:focus,main textarea:focus{outline:none!important;border-color:#60a5fa!important;box-shadow:0 0 0 3px rgba(59,130,246,.13)!important}
+main button{border-radius:11px;transition:transform .13s ease,filter .13s ease,box-shadow .13s ease}
+main button:hover{filter:brightness(1.025)}
+main button:active{transform:scale(.985)}
+main .border{border-color:#e5eaf3!important}
+main table{border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:12px}
+main th{background:#f1f5f9!important;color:#334155!important;font-weight:800}
+main td,main th{border-color:#e7edf5!important}
+main .overflow-x-auto{border-radius:14px}
+@media(min-width:641px) and (max-width:1100px){main{padding:18px!important}main button{min-height:42px}main input,main select{min-height:43px}}
+@media(max-width:640px){body{background:#f6f8fc!important}header.sticky{padding:12px!important}main{padding:12px!important}main button{min-height:40px}main .p-4{padding:13px!important}}
+main h2,main h3{color:#1e3a8a}
+main .grid .bg-white{box-shadow:0 5px 18px rgba(30,64,175,.045)}
+</style>
+
+<style id="women-origin-order-pink-v1">
+/* طلبات المنشأة بواسطة موظفات القسم النسائي: تمييز وردي لطيف */
+#employeeTaskList .v72-task-card.v72-women-origin{
+  background:linear-gradient(135deg,#fff8fb 0%,#fdeaf2 52%,#fff1f7 100%)!important;
+  border:1px solid #e8a9c4!important;
+  box-shadow:0 10px 24px rgba(190,75,125,.12),inset 0 1px 0 rgba(255,255,255,.96)!important;
+}
+#employeeTaskList .v72-task-card.v72-women-origin::before{
+  background:linear-gradient(180deg,#c84f85 0%,#f3a8c8 48%,#b83d75 100%)!important;
+}
+#employeeTaskList .v72-task-card.v72-women-origin .v72-task-label{color:#a3446d!important}
+#employeeTaskList .v72-task-card.v72-women-origin .v72-task-invoice{color:#7d234d!important}
+#employeeTaskList .v72-task-card.v72-women-origin .v72-task-name{color:#6f2348!important}
+#employeeTaskList .v72-task-card.v72-women-origin .v72-task-detail{
+  border-color:#d985aa!important;
+  background:linear-gradient(135deg,#8f315a 0%,#b94778 62%,#d76b9b 100%)!important;
+  color:#fff!important;
+}
+</style>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen">
 <div id="loginScreen">
@@ -1238,6 +1166,10 @@ button[onclick="searchOrderFromDashboard()"] i {
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الفاتورة</label>
                         <input type="text" id="invNum" required readonly placeholder="يُولّد تلقائيًا" class="w-full p-2.5 bg-slate-100 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-800 cursor-not-allowed" title="رقم الفاتورة يُولّد تلقائيًا بدءًا من 100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">رقم المرجع</label>
+                        <input type="text" id="referenceNumber" placeholder="رقم المرجع (اختياري)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">اسم العميل</label>
@@ -1475,6 +1407,10 @@ button[onclick="searchOrderFromDashboard()"] i {
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الفاتورة</label>
                         <input type="text" id="editInvNum" required class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">رقم المرجع</label>
+                        <input type="text" id="editReferenceNumber" placeholder="رقم المرجع (اختياري)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">اسم العميل</label>
@@ -2783,6 +2719,7 @@ function orderWhatsAppTrackingHtml(order){
     if(hasPermission(PERMISSIONS.msgCustomerApproval)) rows.push(whatsappMessageStatusHtml(order,"customerApproval","تأكيد الطلب للعميل"));
     if(hasPermission(PERMISSIONS.msgEmployeeTransfer)) rows.push(whatsappMessageStatusHtml(order,"employeeTransfer","تحويل المهمة للموظف"));
     if(hasCustomerReadyMessagePermission()) rows.push(whatsappMessageStatusHtml(order,"customerReady","جاهزية الطلب للعميل"));
+    if(hasPermission(PERMISSIONS.deliver)) rows.push(whatsappMessageStatusHtml(order,"customerFinalDelivery","التسليم النهائي للعميل"));
     return rows.length?`<div class="mt-3 space-y-2"><div class="text-xs font-extrabold text-slate-600">متابعة رسائل واتساب</div>${rows.join("")}<p class="text-[10px] text-slate-400">يعرض النظام ما إذا تم فتح واتساب للرسالة؛ لا يمكنه معرفة ما إذا تم الضغط على إرسال داخل واتساب.</p></div>`:"";
 }
 
@@ -2847,8 +2784,11 @@ function openEmployeeTaskWhatsApp(orderId){
     openTrackedWhatsApp(orderId,"employeeTransfer",emp.phone,employeeTaskMessage(o,emp));
 }
 function openCustomerDeliveryWhatsApp(orderId){
+    if(!hasPermission(PERMISSIONS.deliver)){alert("ليس لديك صلاحية إرسال رسالة التسليم النهائي للعميل.");return;}
     const o=orders.find(x=>String(x.id)===String(orderId)); if(!o)return;
-    openWhatsAppMessage(o.phone,customerDeliveryMessage(o));
+    if(String(o.status||"")!=="تم التسليم النهائي"){alert("لا يمكن إرسال رسالة التسليم النهائي قبل تسجيل التسليم النهائي للطلب.");return;}
+    if(!o.phone){alert("لا يوجد رقم جوال للعميل في هذا الطلب. تم تسجيل التسليم النهائي، لكن يلزم تحديث رقم الجوال لإرسال الرسالة.");return;}
+    openTrackedWhatsApp(orderId,"customerFinalDelivery",o.phone,customerDeliveryMessage(o));
 }
 
 /* ------------------ Attachments: IndexedDB ------------------ */
@@ -3699,6 +3639,7 @@ async function createOrder(e){
     const order={
         id,
         inv:invoice,
+        referenceNumber:String(document.getElementById("referenceNumber")?.value||"").trim(),
         measurements:savedInvoiceMeasurements,
         customer:document.getElementById("custName").value.trim(),
         phone:document.getElementById("custPhone").value.trim(),
@@ -3714,6 +3655,7 @@ async function createOrder(e){
         createdAt:now,
         createdBy:loggedInAccount?.name || loggedInAccount?.username || "غير معروف",
         createdByUsername:loggedInAccount?.username || "",
+        createdByDepartment:getAccountEmployeeDepartment(loggedInAccount),
         lastUpdated:now,hasNote:false,lastNote:"",
         history:[{
             stage:route.stage,assignedTo:route.display,
@@ -3803,6 +3745,8 @@ async function createOrder(e){
     const rem=document.getElementById("remainingAmount");if(rem)rem.value="0.00";
     const status=document.getElementById("saveStatus");
     if(status){status.textContent="✓ تم حفظ الطلب وتوجيهه بنجاح";status.className="text-xs font-semibold text-green-600";}
+    // تنبيه واضح للمستخدم عند نجاح حفظ واعتماد الطلب.
+    alert(`تم حفظ واعتماد الطلب بنجاح\nرقم الطلب: ${order.inv||order.id}\nالعميل: ${order.customer}`);
     if(hasPermission(PERMISSIONS.msgCustomerApproval)){
         showOrderApprovalWhatsAppPrompt(order.id);
     }
@@ -3832,6 +3776,7 @@ function openEditOrderModal(orderId){
     }
     document.getElementById("editOrderId").value=o.id;
     document.getElementById("editInvNum").value=o.inv||"";
+    document.getElementById("editReferenceNumber").value=o.referenceNumber||o.reference||"";
     document.getElementById("editCustName").value=o.customer||"";
     document.getElementById("editCustPhone").value=o.phone||"";
     document.getElementById("editTotalAmount").value=o.totalAmount||0;
@@ -3897,6 +3842,7 @@ async function saveOrderEdits(e){
 
     const changed=o.assignedTo!==route.display||String(o.assignedToEmployeeId||"")!==String(route.employee?.id||"");
     o.inv=document.getElementById("editInvNum").value.trim();
+    o.referenceNumber=String(document.getElementById("editReferenceNumber")?.value||"").trim();
     o.customer=document.getElementById("editCustName").value.trim();
     o.phone=document.getElementById("editCustPhone").value.trim();
     const editTotal=toMoney(document.getElementById("editTotalAmount").value);
@@ -4049,9 +3995,11 @@ function forwardOrder(orderId, routeOrStage, legacyWorker){
     });
 
     saveOrders();render();
-    // فتح محادثة الموظف برسالة المهمة بعد التحويل؛ الإرسال النهائي يتم من داخل واتساب.
-    if(hasPermission(PERMISSIONS.msgEmployeeTransfer) && route.employee.phone){
-        openWhatsAppMessage(route.employee.phone,employeeTaskMessage(o,route.employee));
+    // فتح رسالة التحويل للمستلم المحدد فقط (مع إعادة جلب الموظف من سجل الموظفين).
+    // لا تستخدم بيانات حساب المرسل أو رقم جواله كبديل عند غياب رقم المستلم.
+    const transferRecipient=employees.find(e=>String(e.id)===String(route.employee.id));
+    if(hasPermission(PERMISSIONS.msgEmployeeTransfer) && transferRecipient && transferRecipient.phone){
+        openWhatsAppMessage(transferRecipient.phone,employeeTaskMessage(o,transferRecipient));
     }
     alert(`تم تحويل الطلب ${orderId} بنجاح إلى الموظف:\n${route.employee.name} (${route.employee.dept})`);
     return true;
@@ -4243,6 +4191,25 @@ function orderOriginHtml(o){
     </div>`;
 }
 
+
+function getAccountEmployeeDepartment(account){
+    if(!account) return "";
+    const byId=account.employeeId?employees.find(e=>String(e.id)===String(account.employeeId)):null;
+    if(byId?.dept) return String(byId.dept);
+    const norm=n=>String(n||"").normalize("NFD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").trim().toLowerCase();
+    const candidates=[account.employeeName,account.name,account.username].map(norm).filter(Boolean);
+    const emp=employees.find(e=>candidates.includes(norm(e.name))||candidates.includes(norm(e.id)));
+    return String(emp?.dept||"");
+}
+function isWomenOriginOrder(order){
+    const dept=String(order?.createdByDepartment||"").trim();
+    if(dept==="القسم النسائي") return true;
+    if(dept) return false;
+    const creator=String(order?.createdBy||order?.createdByUsername||"").trim();
+    const norm=n=>String(n||"").normalize("NFD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").trim().toLowerCase();
+    const emp=employees.find(e=>norm(e.name)===norm(creator)||norm(e.id)===norm(creator));
+    return String(emp?.dept||"").trim()==="القسم النسائي";
+}
 function normalizeOrderOrigin(o){
     if(!o) return;
     if(!o.createdAt){
@@ -4442,7 +4409,8 @@ function submitWomenEmployeeTransfer(){
   const id=order.id;
   closeWomenEmployeeTransfer();
   render();
-  if(hasPermission(PERMISSIONS.msgEmployeeTransfer) && employee.phone)openWhatsAppMessage(employee.phone,employeeTaskMessage(order,employee));
+  const womenTransferRecipient=employees.find(e=>String(e.id)===String(employee.id));
+  if(hasPermission(PERMISSIONS.msgEmployeeTransfer) && womenTransferRecipient && womenTransferRecipient.phone)openWhatsAppMessage(womenTransferRecipient.phone,employeeTaskMessage(order,womenTransferRecipient));
   alert(`تم تحويل الطلب ${id} إلى الموظفة ${employee.name} بنجاح.`);
 }
 
@@ -5237,7 +5205,7 @@ function render(){
     if(taskBox){
         document.getElementById("taskCountBadge").textContent=`${tasks.length} مهام موجهة لي`;
         taskBox.innerHTML=tasks.map(o=>{
-            return `<div class="v72-task-card">
+            return `<div class="v72-task-card ${isWomenOriginOrder(o)?'v72-women-origin':''}">
                 <div class="v72-task-info">
                     <div class="v72-task-label">رقم الفاتورة</div>
                     <div class="v72-task-invoice">${esc(o.inv||"-")}</div>
@@ -6478,6 +6446,39 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }
   }
 
+  function captureFeedback(){
+    // صوت التقاط خفيف + اهتزاز + ومضة مرئية (إذا كان الجهاز يدعمها)
+    try{
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if(AudioCtx){
+        const ctx = new AudioCtx();
+        if(ctx.state === "suspended") ctx.resume().catch(()=>{});
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(1250, ctx.currentTime);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.11);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.12);
+        osc.onended = () => { try{ctx.close();}catch(e){} };
+      }
+    }catch(e){ console.warn("Capture sound unavailable", e); }
+    try{ if(navigator.vibrate) navigator.vibrate(65); }catch(e){}
+    try{
+      let flash = document.getElementById("orderCameraCaptureFlash");
+      if(!flash){
+        flash = document.createElement("div");
+        flash.id = "orderCameraCaptureFlash";
+        flash.style.cssText = "position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999999;transition:opacity 80ms ease";
+        document.body.appendChild(flash);
+      }
+      flash.style.opacity = "0.82";
+      setTimeout(()=>{flash.style.opacity="0";},100);
+    }catch(e){}
+  }
+
   function takePhoto(){
     const video = $("orderCameraPreview");
     const canvas = $("orderCameraCanvas");
@@ -6489,8 +6490,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    captureFeedback();
     canvas.toBlob(blob => {
       if(blob) addImageBlob(blob);
+      else alert("تعذر حفظ الصورة الملتقطة. حاول مرة أخرى.");
     },"image/jpeg",0.92);
   }
 
@@ -7110,5 +7113,94 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 </script>
 
 <!-- V90 legacy camera bridge disabled: replaced by orderCameraSupportFixedV91. -->
+
+<style>
+/* Required-field marker: small red star */
+.required-field-star{color:#dc2626!important;font-weight:800;margin-inline-start:3px;font-size:12px;vertical-align:super;}
+</style>
+<script>
+(function(){
+  function markRequiredFields(){
+    document.querySelectorAll('input[required],select[required],textarea[required]').forEach(function(field){
+      if(field.dataset.requiredStarDone==='1') return;
+      var parent=field.parentElement;
+      var label=parent ? parent.querySelector('label') : null;
+      if(label){
+        var star=document.createElement('span');
+        star.className='required-field-star';
+        star.setAttribute('aria-hidden','true');
+        star.textContent='*';
+        label.appendChild(star);
+      } else if(field.id==='deptNameInput'){
+        var caption=document.createElement('span');
+        caption.className='text-xs font-semibold text-slate-600';
+        caption.style.cssText='display:block;margin-bottom:4px;';
+        caption.innerHTML='اسم القسم الجديد <span class="required-field-star" aria-hidden="true">*</span>';
+        field.parentElement.insertBefore(caption,field);
+      }
+      field.dataset.requiredStarDone='1';
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',markRequiredFields);
+  else markRequiredFields();
+})();
+</script>
+<!-- ===== Online Status Indicator ===== -->
+<div id="onlineStatusBadge"
+     style="position:fixed; bottom:14px; left:14px; z-index:999999;
+            display:flex; align-items:center; gap:8px;
+            padding:8px 14px; border-radius:999px;
+            font-size:12px; font-weight:800;
+            font-family:system-ui,Tahoma,Arial,sans-serif;
+            background:#dcfce7; color:#166534;
+            border:1px solid #86efac;
+            box-shadow:0 4px 14px rgba(15,23,42,.12);
+            transition:all .25s ease; direction:rtl;">
+  <span id="onlineStatusDot"
+        style="width:10px;height:10px;border-radius:50%;
+               background:#22c55e;display:inline-block;
+               box-shadow:0 0 0 3px rgba(34,197,94,.22);"></span>
+  <span id="onlineStatusText">متصل</span>
+</div>
+
+<script>
+(function () {
+  const badge = document.getElementById('onlineStatusBadge');
+  const dot   = document.getElementById('onlineStatusDot');
+  const text  = document.getElementById('onlineStatusText');
+
+  function renderOnline() {
+    badge.style.background = '#dcfce7';
+    badge.style.color      = '#166534';
+    badge.style.borderColor= '#86efac';
+    dot.style.background   = '#22c55e';
+    dot.style.boxShadow    = '0 0 0 3px rgba(34,197,94,.22)';
+    text.textContent       = 'متصل';
+  }
+  function renderOffline() {
+    badge.style.background = '#fee2e2';
+    badge.style.color      = '#991b1b';
+    badge.style.borderColor= '#fca5a5';
+    dot.style.background   = '#ef4444';
+    dot.style.boxShadow    = '0 0 0 3px rgba(239,68,68,.22)';
+    text.textContent       = 'غير متصل';
+  }
+
+  function update() { navigator.onLine ? renderOnline() : renderOffline(); }
+
+  window.addEventListener('online',  update);
+  window.addEventListener('offline', update);
+  update();
+
+  // فحص اختياري لاتصال حقيقي بالإنترنت (مو مجرد شبكة محلية)
+  // كل 30 ثانية يتحقق من ملف صغير على الإنترنت
+  setInterval(() => {
+    if (!navigator.onLine) { renderOffline(); return; }
+    fetch('https://www.gstatic.com/generate_204', { method: 'HEAD', cache: 'no-store' })
+      .then(() => renderOnline())
+      .catch(() => renderOffline());
+  }, 30000);
+})();
+</script>
 </body>
 </html>
