@@ -1,7 +1,7 @@
 // firebase-sync.js
 // ملف المزامنة المنفصل - يعمل مع Firebase Realtime Database
 
-// 1. إعدادات مشروع Firebase
+// 1. إعدادات Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
   authDomain: "xpower3-1f5fd.firebaseapp.com",
@@ -12,7 +12,7 @@ const firebaseConfig = {
   appId: "1:915610586058:web:907839b2fcad344b0d9d33"
 };
 
-// 2. تهيئة Firebase (تأكد من عدم تهيئته مسبقاً)
+// 2. تهيئة Firebase
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
@@ -24,10 +24,10 @@ window.syncAllDataToCloud = function() {
     let localData = {};
     let keysToRemove = [];
 
-    // قراءة البيانات وتجاهل أي مفاتيح تخص إعدادات Firebase
     for (let i = 0; i < localStorage.length; i++) {
       let key = localStorage.key(i);
       
+      // استبعاد المفاتيح الملوثة
       if (key.includes(':') || key.includes('.') || key.toLowerCase().includes('firebase')) {
           keysToRemove.push(key);
           continue;
@@ -41,7 +41,7 @@ window.syncAllDataToCloud = function() {
       }
     }
 
-    // مسح المفاتيح الملوثة من المتصفح
+    // تنظيف المتصفح
     for (let j = 0; j < keysToRemove.length; j++) {
         localStorage.removeItem(keysToRemove[j]);
     }
@@ -51,7 +51,7 @@ window.syncAllDataToCloud = function() {
       return;
     }
 
-    // إرسال البيانات إلى Firebase
+    // رفع البيانات
     database.ref('backup').set({
       data: localData,
       lastSync: new Date().toISOString()
@@ -77,12 +77,12 @@ function showToast(msg, color) {
   setTimeout(function() { toast.remove(); }, 4000);
 }
 
-// 5. إضافة زر المزامنة إلى الشاشة
+// 5. إضافة زر المزامنة
 document.addEventListener("DOMContentLoaded", function() {
   let syncBtn = document.createElement('button');
   syncBtn.innerHTML = "☁️ مزامنة";
   syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
   syncBtn.onclick = window.syncAllDataToCloud;
   document.body.appendChild(syncBtn);
-  console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
+  console.log("🔥 نظام المزامنة جاهز.");
 });
