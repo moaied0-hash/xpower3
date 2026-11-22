@@ -1821,7 +1821,46 @@ function saveAll() {
     localStorage.setItem(STORAGE.employees, JSON.stringify(employees));
     localStorage.setItem(STORAGE.accounts, JSON.stringify(accounts));
     localStorage.setItem(STORAGE.orders, JSON.stringify(orders));
+}
 
+function pruneOptionalMannequinImagesForStorage() {
+    // صور المانيكان مطلوبة للعرض في مراحل الطلب؛ لا نحذفها تلقائياً.
+    // يتم تقليل حجم الصور الجديدة عند توليدها بدلاً من إتلاف الصور المحفوظة.
+    return 0;
+}
+
+function saveOrders() {
+    const payload = JSON.stringify(orders);
+    try {
+        localStorage.setItem(STORAGE.orders, payload);
+        return true;
+    } catch (firstError) {
+        const removed = pruneOptionalMannequinImagesForStorage();
+        try {
+            localStorage.setItem(STORAGE.orders, JSON.stringify(orders));
+            console.warn("تم توفير مساحة بحذف صور مانيكان اختيارية فقط. الصور المحذوفة:", removed);
+            return true;
+        } catch (secondError) {
+            console.error("تعذر حفظ الطلب حتى بعد تنظيف صور المانيكان الاختيارية.", {
+                firstError, secondError, removed,
+                localStorageUsage: (() => {
+                    let bytes = 0;
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        bytes += (key.length + (localStorage.getItem(key) || "").length) * 2;
+                    }
+                    return Math.round(bytes / 1024) + " KB";
+                })()
+            });
+            const error = new Error(
+                "مساحة التخزين المحلية ممتلئة. تم حذف صور المانيكان المولّدة فقط مع الإبقاء على المقاسات والطلبات. " +
+                "لا تزال المساحة غير كافية؛ صدّر نسخة احتياطية من الطلبات ثم أزل ملفات/بيانات قديمة غير لازمة من هذا الجهاز."
+            );
+            error.name = "QuotaExceededError";
+            throw error;
+        }
+    }
+}
 
 function saveAccounts() {
     localStorage.setItem(STORAGE.accounts, JSON.stringify(accounts));
@@ -7106,10 +7145,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   else markRequiredFields();
 })();
 </script>
-    <script type="module">
+    <!-- ==================================================== -->
+<!-- كود المزامنة مع Firebase - جاهز للنسخ -->
+<!-- ==================================================== -->
+<script type="module">
+  // 1. استيراد مكتبات Firebase من CDN
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+  // 2. إعدادات مشروعك
   const firebaseConfig = {
     apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
     authDomain: "xpower3-1f5fd.firebaseapp.com",
@@ -7120,86 +7164,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     appId: "1:915610586058:web:907839b2fcad344b0d9d33"
   };
 
+  // 3. تهيئة Firebase
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  window.syncAllDataToCloud = async function() {
-    try {
-      // 1. نقرأ جميع البيانات من localStorage (أياً كان اسمها)
-      let localData = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        try {
-          localData[key] = JSON.parse(localStorage.getItem(key));
-        } catch (e) {
-          localData[key] = localStorage.getItem(key); // إذا لم تكن JSON
-        }
-      }
-
-      if (Object.keys(localData).length === 0) {
-        showToast("⚠️ لا توجد بيانات محلية للمزامنة", "#f59e0b");
-        return;
-      }
-
-      // 2. نرفع البيانات إلى Firebase
-      const docRef = doc(db, "appData", "backup");
-      await setDoc(docRef, { 
-        data: localData, 
-        lastSync: new Date().toISOString() 
-      }, { merge: true });
-
-      console.log("✅ تمت المزامنة بنجاح!", localData);
-      showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
-      
-    } catch (e) {
-      console.error("❌ فشلت المزامنة:", e);
-      // إذا كان الخطأ بسبب الصلاحيات، نظهره بوضوح
-      if (e.code === 'permission-denied') {
-        showToast("❌ خطأ في الصلاحيات: تحقق من قواعد Firestore", "#dc2626");
-      } else {
-        showToast("❌ فشلت المزامنة: " + e.message, "#dc2626");
-      }
-    }
-  };
-
-  // دالة الإشعارات
-  function showToast(msg, color) {
-    const toast = document.createElement('div');
-    toast.textContent = msg;
-    toast.style.cssText = `position:fixed; bottom:80px; right:20px; background:${color}; color:white; padding:10px 18px; border-radius:8px; z-index:99999; font-weight:bold; font-family:system-ui; box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-  }
-
-  // زر المزامنة
-  const syncBtn = document.createElement('button');
-  syncBtn.innerHTML = "☁️ مزامنة";
-  syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
-  syncBtn.onclick = window.syncAllDataToCloud;
-  document.body.appendChild(syncBtn);
-
-  console.log("🔥 نظام المزامنة جاهز. اضغط على الزر.");
-</script>
-    <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyAh7SrMqY1WCJ_8a79dyfWs98Ue2chaUC0",
-    authDomain: "xpower3-1f5fd.firebaseapp.com",
-    databaseURL: "https://xpower3-1f5fd-default-rtdb.firebaseio.com",
-    projectId: "xpower3-1f5fd",
-    storageBucket: "xpower3-1f5fd.firebasestorage.app",
-    messagingSenderId: "915610586058",
-    appId: "1:915610586058:web:907839b2fcad344b0d9d33"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
+  // 4. دالة المزامنة (تقرأ كل شيء من localStorage وترفعه)
   window.syncAllDataToCloud = async function() {
     try {
       let localData = {};
+      // نقرأ كل المفاتيح الموجودة في localStorage
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         try {
@@ -7214,10 +7187,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         return;
       }
 
+      // نرفع البيانات لمجموعة appData ومستند backup
       const docRef = doc(db, "appData", "backup");
       await setDoc(docRef, { data: localData, lastSync: new Date().toISOString() }, { merge: true });
       
-      console.log("✅ تمت المزامنة بنجاح!");
+      console.log("✅ تمت المزامنة بنجاح!", localData);
       showToast("☁️ تمت المزامنة بنجاح", "#16a34a");
     } catch (e) {
       console.error("❌ فشلت المزامنة:", e);
@@ -7225,6 +7199,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }
   };
 
+  // دالة الإشعارات
   function showToast(msg, color) {
     const toast = document.createElement('div');
     toast.textContent = msg;
@@ -7233,6 +7208,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     setTimeout(() => toast.remove(), 4000);
   }
 
+  // زر المزامنة العائم
   const syncBtn = document.createElement('button');
   syncBtn.innerHTML = "☁️ مزامنة";
   syncBtn.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:99999; background:#2563eb; color:white; padding:12px 20px; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-family:system-ui; font-size:15px; box-shadow:0 4px 12px rgba(37,99,235,0.4);";
